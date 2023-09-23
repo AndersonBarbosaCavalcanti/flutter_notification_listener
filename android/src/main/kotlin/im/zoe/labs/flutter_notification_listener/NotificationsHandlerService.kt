@@ -93,7 +93,16 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
           }
           "service.listNotifications" -> {
                 val notifications = listNotifications()
-                result.success(notifications)
+                result.success(notifications) 
+            }
+            "service.removeNotificationFromSharedPreferences" -> {
+              val args = call.arguments<ArrayList<*>?>()
+              val _id = args!![0]!! as String
+              if (!eventsCache.contains(_id)) {
+                  return result.error("notFound", "can't found this notification $_id", "")
+              }
+              val r = removeNotificationFromSharedPreferences(_id)
+                result.success(r) 
             }
           else -> {
               Log.d(TAG, "unknown method ${call.method}")
@@ -536,6 +545,33 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         }
         return null
     }
+
+    private fun removeNotificationFromSharedPreferences(idToRemove: String): Boolean {
+        try {
+            val sharedPreferences = mContext.getSharedPreferences("MyAppPreferences", Context.MODE_PRIVATE)
+            val editor = sharedPreferences.edit()
+
+            // Obtendo a lista atual de notificações
+            val notificationsSet = sharedPreferences.getStringSet("notifications", HashSet()) ?: HashSet()
+
+            if (notificationsSet.isNotEmpty()) {
+                // Encontrando o último elemento da lista
+                val lastNotification = notificationsSet.last()
+
+                // Removendo a última notificação
+                notificationsSet.remove(lastNotification)
+
+                // Salvando a lista atualizada no SharedPreferences
+                editor.putStringSet("notifications", notificationsSet)
+                editor.apply()
+            }
+            return true;
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false;
+        }
+    }
+
 
 
 }

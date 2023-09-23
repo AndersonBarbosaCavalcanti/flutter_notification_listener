@@ -159,6 +159,11 @@ class NotificationsListener {
     return await _bgMethodChannel.invokeMethod<dynamic>("service.listNotifications");
   }
 
+  static Future<bool?> removeNotificationFromSharedPreferences(String _id) async {
+    return await _bgMethodChannel
+        .invokeMethod<bool?>("service.removeNotificationFromSharedPreferences", [_id]);
+  }
+
   static void _defaultCallbackHandle(NotificationEvent evt) {
     final SendPort? _send = IsolateNameServer.lookupPortByName(SEND_PORT_NAME);
     print("[default callback handler] [send isolate nameserver]");
