@@ -473,9 +473,8 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     private fun sendEvent(evt: NotificationEvent) {
-        Log.d(TAG, "send notification event: ${evt.data}")
-        Log.d(TAG, FlutterNotificationListenerPlugin.SHARED_PREFERENCES_KEY)
-        Log.d(TAG, FlutterNotificationListenerPlugin.CALLBACK_HANDLE_KEY)
+        Log.d(TAG, "send notification event: ...")
+        //Log.d(TAG, "send notification event: ${evt.data}")
 
         saveNotificationToSharedPreferences(evt.data as Map<String, String>)
         
