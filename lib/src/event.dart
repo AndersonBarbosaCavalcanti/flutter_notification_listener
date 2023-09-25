@@ -119,6 +119,7 @@ class NotificationEvent {
 
   /// the content of the notification
   String? text;
+  String? bigText;
 
   /// DEPRECATE
   String? message;
@@ -165,6 +166,7 @@ class NotificationEvent {
     this.packageName,
     this.title,
     this.text,
+    this.bigText,
     this.message,
     this.timestamp,
     // this.icon,
@@ -189,6 +191,7 @@ class NotificationEvent {
       packageName: map['package_name'],
       title: map['title'],
       text: map['text'],
+      bigText: map['bigText'],
       message: map["message"],
       timestamp: map["timestamp"],
       // icon: map['icon'],

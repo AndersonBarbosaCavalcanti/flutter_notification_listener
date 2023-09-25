@@ -156,12 +156,24 @@ class NotificationsListener {
   }
 
   static Future<dynamic> listNotifications() async {
-    return await _bgMethodChannel.invokeMethod<dynamic>("service.listNotifications");
+    try {
+      final resultado = await _methodChannel.invokeMethod<dynamic>("service.listNotifications");
+      return resultado;
+    } catch (e) {
+      print("O método 'service.listNotifications' não existe ou ocorreu um erro: $e");
+      final resultado = await _bgMethodChannel.invokeMethod<dynamic>("service.listNotifications");
+      return resultado;
+    }
   }
 
-  static Future<bool?> removeNotificationFromSharedPreferences(String _id) async {
-    return await _bgMethodChannel
-        .invokeMethod<bool?>("service.removeNotificationFromSharedPreferences", [_id]);
+  static Future<bool?> removeNotificationFromSharedPreferences(String timestamp, String text) async {
+    try {
+      return await _methodChannel
+          .invokeMethod<bool?>("service.removeNotificationFromSharedPreferences", [timestamp, text]);
+    } catch (e) {
+      return await _bgMethodChannel
+          .invokeMethod<bool?>("service.removeNotificationFromSharedPreferences", [timestamp, text]);
+    }
   }
 
   static void _defaultCallbackHandle(NotificationEvent evt) {

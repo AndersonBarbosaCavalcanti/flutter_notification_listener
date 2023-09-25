@@ -97,11 +97,9 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
             }
             "service.removeNotificationFromSharedPreferences" -> {
               val args = call.arguments<ArrayList<*>?>()
-              val _id = args!![0]!! as String
-              if (!eventsCache.contains(_id)) {
-                  return result.error("notFound", "can't found this notification $_id", "")
-              }
-              val r = removeNotificationFromSharedPreferences(_id)
+              val timestamp = args!![0]!! as String
+              val text = args!![1]!! as String
+              val r = removeNotificationFromSharedPreferences(timestamp, text)
                 result.success(r) 
             }
           else -> {
@@ -474,7 +472,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
     private fun sendEvent(evt: NotificationEvent) {
         Log.d(TAG, "send notification event: ...")
-        //Log.d(TAG, "send notification event: ${evt.data}")
+        Log.d(TAG, "send notification event: ${evt.data}")
 
         saveNotificationToSharedPreferences(evt.data as Map<String, String>)
         
@@ -496,16 +494,9 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
             val sharedPreferences = mContext.getSharedPreferences("MyAppPreferences", Context.MODE_PRIVATE)
             val editor = sharedPreferences.edit()
 
-            // Serializando a notificação para uma String
             val serializedNotification = serializeNotification(notificationData)
-
-            // Obtendo a lista atual de notificações
             val notificationsSet = sharedPreferences.getStringSet("notifications", HashSet()) ?: HashSet()
-
-            // Adicionando a notificação serializada à lista
             notificationsSet.add(serializedNotification)
-
-            // Salvando a lista de notificações no SharedPreferences
             editor.putStringSet("notifications", notificationsSet)
             editor.apply()
         } catch (e: Exception) {
@@ -514,10 +505,17 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     private fun serializeNotification(notificationData: Map<String, String>): String {
-        // Você pode usar uma biblioteca de serialização, como Gson, para serializar a notificação
-        // Aqui está um exemplo simples usando Gson:
-        val gson = Gson()
-        return gson.toJson(notificationData)
+        val filteredData = notificationData.filterKeys {
+            it == "title" || 
+            it == "package_name" || 
+            it == "text" || 
+            it == "bigText" || 
+            it == "id" || 
+            it == "_id" || 
+            it == "channelId" || 
+            it == "timestamp"
+        }
+        return Gson().toJson(filteredData)
     }
 
     private fun listNotifications(): List<Map<String, String>> {
@@ -545,33 +543,22 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         return null
     }
 
-    private fun removeNotificationFromSharedPreferences(idToRemove: String): Boolean {
+    private fun removeNotificationFromSharedPreferences(timestamp: String, text: String): Boolean {
         try {
             val sharedPreferences = mContext.getSharedPreferences("MyAppPreferences", Context.MODE_PRIVATE)
             val editor = sharedPreferences.edit()
-
-            // Obtendo a lista atual de notificações
+            
             val notificationsSet = sharedPreferences.getStringSet("notifications", HashSet()) ?: HashSet()
-
-            if (notificationsSet.isNotEmpty()) {
-                // Encontrando o último elemento da lista
-                val lastNotification = notificationsSet.last()
-
-                // Removendo a última notificação
-                notificationsSet.remove(lastNotification)
-
-                // Salvando a lista atualizada no SharedPreferences
-                editor.putStringSet("notifications", notificationsSet)
-                editor.apply()
+            notificationsSet.removeIf { notification -> 
+                notification.contains(timestamp)
             }
+            editor.putStringSet("notifications", notificationsSet)
+            editor.apply()
             return true;
         } catch (e: Exception) {
             e.printStackTrace()
-            return false;
+            return false
         }
     }
-
-
-
 }
 
