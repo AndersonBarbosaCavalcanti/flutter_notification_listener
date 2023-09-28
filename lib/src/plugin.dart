@@ -160,7 +160,6 @@ class NotificationsListener {
       final resultado = await _methodChannel.invokeMethod<dynamic>("service.listNotifications");
       return resultado;
     } catch (e) {
-      print("O método 'service.listNotifications' não existe ou ocorreu um erro: $e");
       final resultado = await _bgMethodChannel.invokeMethod<dynamic>("service.listNotifications");
       return resultado;
     }

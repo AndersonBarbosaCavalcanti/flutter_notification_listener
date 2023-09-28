@@ -168,10 +168,10 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
         synchronized(sServiceStarted) {
             if (!sServiceStarted.get()) {
-                Log.d(TAG, "service is not start try to queue the event")
+                //Log.d(TAG, "service is not start try to queue the event")
                 queue.add(evt)
             } else {
-                Log.d(TAG, "send event to flutter side immediately!")
+                //Log.d(TAG, "send event to flutter side immediately!")
                 Handler(mContext.mainLooper).post { sendEvent(evt) }
             }
         }
@@ -187,7 +187,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     private fun initFinish() {
-        Log.d(TAG, "service's flutter engine initialize finished")
+        //Log.d(TAG, "service's flutter engine initialize finished")
         synchronized(sServiceStarted) {
             while (!queue.isEmpty()) sendEvent(queue.remove())
             sServiceStarted.set(true)
@@ -471,8 +471,8 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     private fun sendEvent(evt: NotificationEvent) {
-        Log.d(TAG, "send notification event: ...")
-        Log.d(TAG, "send notification event: ${evt.data}")
+        //Log.d(TAG, "send notification event: ...")
+        //Log.d(TAG, "send notification event: ${evt.data}")
 
         saveNotificationToSharedPreferences(evt.data as Map<String, String>)
         
@@ -500,6 +500,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
             editor.putStringSet("notifications", notificationsSet)
             editor.apply()
         } catch (e: Exception) {
+            Log.d(TAG, "} catch (e: Exception) { saveNotificationToSharedPreferences")
             e.printStackTrace()
         }
     }
