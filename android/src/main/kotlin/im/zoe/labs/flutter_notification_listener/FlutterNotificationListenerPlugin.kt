@@ -90,7 +90,7 @@ class FlutterNotificationListenerPlugin : FlutterPlugin, MethodChannel.MethodCal
     }
 
     private fun initialize(context: Context, cbId: Long) {
-      Log.d(TAG, "plugin init: install callback and notify the service flutter engine changed")
+      //Log.d(TAG, "plugin init: install callback and notify the service flutter engine changed")
       context.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
         .edit()
         .putLong(CALLBACK_DISPATCHER_HANDLE_KEY, cbId)

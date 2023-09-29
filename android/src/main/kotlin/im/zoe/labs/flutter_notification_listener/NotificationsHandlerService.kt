@@ -405,7 +405,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         }
 
         fun updateFlutterEngine(context: Context) {
-            Log.d(TAG, "call instance update flutter engine from plugin init")
+            //Log.d(TAG, "call instance update flutter engine from plugin init")
             instance?.updateFlutterEngine(context)
             // we need to `finish init` manually
             instance?.initFinish()
@@ -444,7 +444,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     private fun updateFlutterEngine(context: Context) {
-        Log.d(TAG, "update the flutter engine of service")
+        //Log.d(TAG, "update the flutter engine of service")
         // take the engine
         val eng = getFlutterEngine(context)
         sBackgroundFlutterEngine = eng
