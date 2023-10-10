@@ -1,10 +1,12 @@
 package im.zoe.labs.flutter_notification_listener
 
+import NotificationDbHelper
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.RemoteInput
 import android.content.ComponentName
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -490,44 +492,67 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     private fun saveNotificationToSharedPreferences(notificationData: Map<String, String>) {
-        try {
-            val sharedPreferences = mContext.getSharedPreferences("MyAppPreferences", Context.MODE_PRIVATE)
-            val editor = sharedPreferences.edit()
+        val dbHelper = NotificationDbHelper(mContext)
+        val db = dbHelper.writableDatabase
 
-            val serializedNotification = serializeNotification(notificationData)
-            val notificationsSet = sharedPreferences.getStringSet("notifications", HashSet()) ?: HashSet()
-            notificationsSet.add(serializedNotification)
-            editor.putStringSet("notifications", notificationsSet)
-            editor.apply()
-        } catch (e: Exception) {
-            Log.d(TAG, "} catch (e: Exception) { saveNotificationToSharedPreferences")
-            e.printStackTrace()
-        }
+        val values = ContentValues()
+        values.put(NotificationDbHelper.COLUMN_TITLE, notificationData["title"] as? String)
+        values.put(NotificationDbHelper.COLUMN_PACKAGE_NAME, notificationData["package_name"] as? String)
+        values.put(NotificationDbHelper.COLUMN_TEXT, notificationData["text"] as? String)
+        values.put(NotificationDbHelper.COLUMN_BIG_TEXT, notificationData["bigText"] as? String)
+        values.put(NotificationDbHelper.COLUMN__ID, notificationData["_id"] as? String)
+        values.put(NotificationDbHelper.COLUMN_CHANNEL_ID, notificationData["channelId"] as? String)
+        values.put(NotificationDbHelper.COLUMN_TIMESTAMP, notificationData["timestamp"] as? Long)
+        // Add other columns here
+
+        db.insert(NotificationDbHelper.TABLE_NOTIFICATIONS, null, values)
+        db.close()
     }
 
     private fun serializeNotification(notificationData: Map<String, String>): String {
         val filteredData = notificationData.filterKeys {
-            it == "title" || 
-            it == "package_name" || 
-            it == "text" || 
-            it == "bigText" || 
-            it == "id" || 
-            it == "_id" || 
-            it == "channelId" || 
+            it == "title" ||
+            it == "package_name" ||
+            it == "text" ||
+            it == "bigText" ||
+            it == "id" ||
+            it == "_id" ||
+            it == "channelId" ||
             it == "timestamp"
         }
         return Gson().toJson(filteredData)
     }
 
-    private fun listNotifications(): List<Map<String, String>> {
-        val notifications = mutableListOf<Map<String, String>>()
-        val sharedPreferences = mContext.getSharedPreferences("MyAppPreferences", Context.MODE_PRIVATE)
-        val serializedNotifications = sharedPreferences.getStringSet("notifications", emptySet())
+    private fun listNotifications(): List<Map<String, Any>> {
+        val dbHelper = NotificationDbHelper(mContext)
+        val db = dbHelper.readableDatabase
 
-        serializedNotifications?.forEach { serializedNotification ->
-            val notification = deserializeNotification(serializedNotification)
-            notification?.let { notifications.add(it) }
+        val notifications = mutableListOf<Map<String, Any>>()
+        val cursor = db.query(
+            NotificationDbHelper.TABLE_NOTIFICATIONS,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        )
+
+        while (cursor.moveToNext()) {
+            val notification = HashMap<String, Any>();
+            notification["title"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_TITLE)) ?: ""
+            notification["package_name"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_PACKAGE_NAME)) ?: ""
+            notification["text"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_TEXT)) ?: ""
+            notification["bigText"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_BIG_TEXT)) ?: ""
+            notification["id"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN__ID)) ?: ""
+            notification["channelId"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_CHANNEL_ID)) ?: ""
+            notification["timestamp"] = cursor.getLong(cursor.getColumnIndex(NotificationDbHelper.COLUMN_TIMESTAMP))
+            // Add other columns here
+            notifications.add(notification)
         }
+
+        cursor.close()
+        db.close()
 
         return notifications
     }
@@ -545,21 +570,14 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     private fun removeNotificationFromSharedPreferences(timestamp: String, text: String): Boolean {
-        try {
-            val sharedPreferences = mContext.getSharedPreferences("MyAppPreferences", Context.MODE_PRIVATE)
-            val editor = sharedPreferences.edit()
-            
-            val notificationsSet = sharedPreferences.getStringSet("notifications", HashSet()) ?: HashSet()
-            notificationsSet.removeIf { notification -> 
-                notification.contains(timestamp)
-            }
-            editor.putStringSet("notifications", notificationsSet)
-            editor.apply()
-            return true;
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
-        }
+        val dbHelper = NotificationDbHelper(mContext)
+        val db = dbHelper.writableDatabase
+
+        val deletedRows = db.delete(NotificationDbHelper.TABLE_NOTIFICATIONS, "${NotificationDbHelper.COLUMN_TIMESTAMP} = ?", arrayOf(timestamp.toString()))
+
+        db.close()
+
+        return deletedRows > 0
     }
 }
 
