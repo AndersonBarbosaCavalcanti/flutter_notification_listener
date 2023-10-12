@@ -573,7 +573,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         val dbHelper = NotificationDbHelper(mContext)
         val db = dbHelper.writableDatabase
 
-        val deletedRows = db.delete(NotificationDbHelper.TABLE_NOTIFICATIONS, "${NotificationDbHelper.COLUMN_TIMESTAMP} = ?", arrayOf(timestamp.toString()))
+        val deletedRows = db.delete(NotificationDbHelper.TABLE_NOTIFICATIONS, "${NotificationDbHelper.COLUMN_TIMESTAMP} = ?", arrayOf("$timestamp"))
 
         db.close()
 
