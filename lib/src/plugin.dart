@@ -165,6 +165,26 @@ class NotificationsListener {
     }
   }
 
+  static Future<dynamic> listNotificationsDeleted() async {
+    try {
+      final resultado = await _methodChannel.invokeMethod<dynamic>("service.listNotificationsDeleted");
+      return resultado;
+    } catch (e) {
+      final resultado = await _bgMethodChannel.invokeMethod<dynamic>("service.listNotificationsDeleted");
+      return resultado;
+    }
+  }
+
+  static Future<dynamic> getNotificationsFromStatusBar() async {
+    try {
+      final resultado = await _methodChannel.invokeMethod<dynamic>("service.getNotificationsFromStatusBar");
+      return resultado;
+    } catch (e) {
+      final resultado = await _bgMethodChannel.invokeMethod<dynamic>("service.getNotificationsFromStatusBar");
+      return resultado;
+    }
+  }
+
   static Future<bool?> removeNotificationFromSharedPreferences(String timestamp, String text) async {
     try {
       return await _methodChannel

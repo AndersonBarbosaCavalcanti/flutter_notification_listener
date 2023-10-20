@@ -1,6 +1,7 @@
 package im.zoe.labs.flutter_notification_listener
 
 import NotificationDbHelper
+import NotificationDeletedDbHelper
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -20,7 +21,6 @@ import android.service.notification.StatusBarNotification
 import android.text.TextUtils
 import android.util.Log
 import androidx.annotation.NonNull
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -31,10 +31,9 @@ import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.FlutterCallbackInformation
-import org.json.JSONObject
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.collections.HashMap
+
 
 class NotificationsHandlerService: MethodChannel.MethodCallHandler, NotificationListenerService() {
     private val queue = ArrayDeque<NotificationEvent>()
@@ -97,6 +96,14 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
                 val notifications = listNotifications()
                 result.success(notifications) 
             }
+            "service.listNotificationsDeleted" -> {
+                val notifications = listNotificationsDeleted()
+                result.success(notifications) 
+            }
+          "service.getNotificationsFromStatusBar" -> {
+              val notifications = getNotificationsFromStatusBar()
+              result.success(notifications)
+          }
             "service.removeNotificationFromSharedPreferences" -> {
               val args = call.arguments<ArrayList<*>?>()
               val timestamp = args!![0]!! as String
@@ -185,6 +192,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         val evt = NotificationEvent(mContext, sbn)
         // remove the event from cache
         eventsCache.remove(evt.uid)
+        saveNotificationDeletedToLocalDb(evt.data as Map<String, String>)
         Log.d(TAG, "notification removed: ${evt.uid}")
     }
 
@@ -476,7 +484,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         //Log.d(TAG, "send notification event: ...")
         //Log.d(TAG, "send notification event: ${evt.data}")
 
-        saveNotificationToSharedPreferences(evt.data as Map<String, String>)
+        saveNotificationToLocalDb(evt.data as Map<String, String>)
         
         callbackHandle = mContext.getSharedPreferences(FlutterNotificationListenerPlugin.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
             .getLong(FlutterNotificationListenerPlugin.CALLBACK_HANDLE_KEY, 0)
@@ -491,7 +499,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         }
     }
 
-    private fun saveNotificationToSharedPreferences(notificationData: Map<String, String>) {
+    private fun saveNotificationToLocalDb(notificationData: Map<String, String>) {
         val dbHelper = NotificationDbHelper(mContext)
         val db = dbHelper.writableDatabase
 
@@ -506,6 +514,24 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         // Add other columns here
 
         db.insert(NotificationDbHelper.TABLE_NOTIFICATIONS, null, values)
+        db.close()
+    }
+
+    private fun saveNotificationDeletedToLocalDb(notificationData: Map<String, String>) {
+        val dbHelper = NotificationDeletedDbHelper(mContext)
+        val db = dbHelper.writableDatabase
+
+        val values = ContentValues()
+        values.put(NotificationDeletedDbHelper.COLUMN_TITLE, notificationData["title"] as? String)
+        values.put(NotificationDeletedDbHelper.COLUMN_PACKAGE_NAME, notificationData["package_name"] as? String)
+        values.put(NotificationDeletedDbHelper.COLUMN_TEXT, notificationData["text"] as? String)
+        values.put(NotificationDeletedDbHelper.COLUMN_BIG_TEXT, notificationData["bigText"] as? String)
+        values.put(NotificationDeletedDbHelper.COLUMN__ID, notificationData["_id"] as? String)
+        values.put(NotificationDeletedDbHelper.COLUMN_CHANNEL_ID, notificationData["channelId"] as? String)
+        values.put(NotificationDeletedDbHelper.COLUMN_TIMESTAMP, notificationData["timestamp"] as? Long)
+        // Add other columns here
+
+        db.insert(NotificationDeletedDbHelper.TABLE_NOTIFICATIONS, null, values)
         db.close()
     }
 
@@ -553,6 +579,52 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
         cursor.close()
         db.close()
+
+        return notifications
+    }
+
+    private fun listNotificationsDeleted(): List<Map<String, Any>> {
+        val dbHelper = NotificationDeletedDbHelper(mContext)
+        val db = dbHelper.readableDatabase
+
+        val notifications = mutableListOf<Map<String, Any>>()
+        val cursor = db.query(
+            NotificationDeletedDbHelper.TABLE_NOTIFICATIONS,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        )
+
+        while (cursor.moveToNext()) {
+            val notification = HashMap<String, Any>();
+            notification["title"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_TITLE)) ?: ""
+            notification["package_name"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_PACKAGE_NAME)) ?: ""
+            notification["text"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_TEXT)) ?: ""
+            notification["bigText"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_BIG_TEXT)) ?: ""
+            notification["id"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN__ID)) ?: ""
+            notification["channelId"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_CHANNEL_ID)) ?: ""
+            notification["timestamp"] = cursor.getLong(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_TIMESTAMP))
+            // Add other columns here
+            notifications.add(notification)
+        }
+
+        cursor.close()
+        db.close()
+
+        return notifications
+    }
+
+    private fun getNotificationsFromStatusBar(): List<Map<String, Any?>> {
+        val notifications = mutableListOf<Map<String, Any?>>()
+        val activeNotifications = activeNotifications
+        for (sbn in activeNotifications) {
+
+            val evt = NotificationEvent(mContext, sbn)
+            notifications.add(evt.data)
+        }
 
         return notifications
     }
