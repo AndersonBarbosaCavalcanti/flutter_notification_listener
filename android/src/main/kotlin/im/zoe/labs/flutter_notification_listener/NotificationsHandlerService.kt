@@ -1,7 +1,7 @@
 package im.zoe.labs.flutter_notification_listener
 
 import NotificationDbHelper
-import NotificationDeletedDbHelper
+import NotificationTmpDbHelper
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -96,19 +96,19 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
                 val notifications = listNotifications()
                 result.success(notifications) 
             }
-            "service.listNotificationsDeleted" -> {
-                val notifications = listNotificationsDeleted()
+            "service.listNotificationsTmp" -> {
+                val notifications = listNotificationsTmp()
                 result.success(notifications) 
             }
           "service.getNotificationsFromStatusBar" -> {
               val notifications = getNotificationsFromStatusBar()
               result.success(notifications)
           }
-            "service.removeNotificationFromSharedPreferences" -> {
+            "service.removeNotificationFromLocalDb" -> {
               val args = call.arguments<ArrayList<*>?>()
               val timestamp = args!![0]!! as String
               val text = args!![1]!! as String
-              val r = removeNotificationFromSharedPreferences(timestamp, text)
+              val r = removeNotificationFromLocalDb(timestamp, text)
                 result.success(r) 
             }
           else -> {
@@ -164,6 +164,17 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         Log.i(TAG, "notification listener service onTaskRemoved")
     }
 
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+
+        cancelAllNotifications()
+
+        var listNotificationsTmp = listNotificationsTmp();
+        for (item in listNotificationsTmp) {
+            removeNotificationTmpFromLocalDb("${item["timestamp"]}", "")
+        }
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
 
@@ -192,7 +203,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         val evt = NotificationEvent(mContext, sbn)
         // remove the event from cache
         eventsCache.remove(evt.uid)
-        saveNotificationDeletedToLocalDb(evt.data as Map<String, String>)
+        removeNotificationTmpFromLocalDb("${evt.data["timestamp"]}", "")
         Log.d(TAG, "notification removed: ${evt.uid}")
     }
 
@@ -482,10 +493,55 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
     private fun sendEvent(evt: NotificationEvent) {
         //Log.d(TAG, "send notification event: ...")
-        //Log.d(TAG, "send notification event: ${evt.data}")
 
-        saveNotificationToLocalDb(evt.data as Map<String, String>)
-        
+        var listNotificationsTmp = listNotificationsTmp();
+        var totTmp = 0;
+        var totStatusBar = 0;
+
+        for (item in listNotificationsTmp) {
+            if(
+                item["title"] == evt.data["title"] &&
+                item["package_name"] == evt.data["package_name"] &&
+                item["text"] == evt.data["text"]
+            ) {
+                if(evt.data["bigText"] != null && item["bigText"] == evt.data["bigText"]) {
+                    totTmp += 1;
+                } else if(evt.data["bigText"] == null && item["bigText"] == "") {
+                    totTmp += 1;
+                }
+            }
+        }
+
+        var listNotificationsStatusBar = getNotificationsFromStatusBar();
+        for (item in listNotificationsStatusBar) {
+            if(
+                item["title"] == evt.data["title"] &&
+                item["package_name"] == evt.data["package_name"] &&
+                item["text"] == evt.data["text"] &&
+                item["bigText"] == evt.data["bigText"]
+            ) {
+                totStatusBar++;
+            }
+        }
+
+        if(totTmp == 0) {
+            for (item in listNotificationsTmp) {
+                if(
+                    item["title"] == evt.data["title"] &&
+                    item["package_name"] == evt.data["package_name"] &&
+                    item["text"] == evt.data["text"] &&
+                    item["bigText"] == evt.data["bigText"]
+                ) {
+                    removeNotificationFromLocalDb("${item["timestamp"]}", "")
+                }
+            }
+        }
+
+        if(totTmp < totStatusBar || totTmp == 0) {
+            saveNotificationToLocalDb(evt.data as Map<String, String>)
+            saveNotificationTmpToLocalDb(evt.data as Map<String, String>)
+        }
+
         callbackHandle = mContext.getSharedPreferences(FlutterNotificationListenerPlugin.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
             .getLong(FlutterNotificationListenerPlugin.CALLBACK_HANDLE_KEY, 0)
 
@@ -509,6 +565,7 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         values.put(NotificationDbHelper.COLUMN_TEXT, notificationData["text"] as? String)
         values.put(NotificationDbHelper.COLUMN_BIG_TEXT, notificationData["bigText"] as? String)
         values.put(NotificationDbHelper.COLUMN__ID, notificationData["_id"] as? String)
+        values.put(NotificationDbHelper.COLUMN_ID, notificationData["id"] as? String)
         values.put(NotificationDbHelper.COLUMN_CHANNEL_ID, notificationData["channelId"] as? String)
         values.put(NotificationDbHelper.COLUMN_TIMESTAMP, notificationData["timestamp"] as? Long)
         // Add other columns here
@@ -517,21 +574,22 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         db.close()
     }
 
-    private fun saveNotificationDeletedToLocalDb(notificationData: Map<String, String>) {
-        val dbHelper = NotificationDeletedDbHelper(mContext)
+    private fun saveNotificationTmpToLocalDb(notificationData: Map<String, String>) {
+        val dbHelper = NotificationTmpDbHelper(mContext)
         val db = dbHelper.writableDatabase
 
         val values = ContentValues()
-        values.put(NotificationDeletedDbHelper.COLUMN_TITLE, notificationData["title"] as? String)
-        values.put(NotificationDeletedDbHelper.COLUMN_PACKAGE_NAME, notificationData["package_name"] as? String)
-        values.put(NotificationDeletedDbHelper.COLUMN_TEXT, notificationData["text"] as? String)
-        values.put(NotificationDeletedDbHelper.COLUMN_BIG_TEXT, notificationData["bigText"] as? String)
-        values.put(NotificationDeletedDbHelper.COLUMN__ID, notificationData["_id"] as? String)
-        values.put(NotificationDeletedDbHelper.COLUMN_CHANNEL_ID, notificationData["channelId"] as? String)
-        values.put(NotificationDeletedDbHelper.COLUMN_TIMESTAMP, notificationData["timestamp"] as? Long)
+        values.put(NotificationTmpDbHelper.COLUMN_TITLE, notificationData["title"] as? String)
+        values.put(NotificationTmpDbHelper.COLUMN_PACKAGE_NAME, notificationData["package_name"] as? String)
+        values.put(NotificationTmpDbHelper.COLUMN_TEXT, notificationData["text"] as? String)
+        values.put(NotificationTmpDbHelper.COLUMN_BIG_TEXT, notificationData["bigText"] as? String)
+        values.put(NotificationTmpDbHelper.COLUMN__ID, notificationData["_id"] as? String)
+        values.put(NotificationTmpDbHelper.COLUMN_ID, notificationData["id"] as? String)
+        values.put(NotificationTmpDbHelper.COLUMN_CHANNEL_ID, notificationData["channelId"] as? String)
+        values.put(NotificationTmpDbHelper.COLUMN_TIMESTAMP, notificationData["timestamp"] as? Long)
         // Add other columns here
 
-        db.insert(NotificationDeletedDbHelper.TABLE_NOTIFICATIONS, null, values)
+        db.insert(NotificationTmpDbHelper.TABLE_NOTIFICATIONS, null, values)
         db.close()
     }
 
@@ -570,7 +628,8 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
             notification["package_name"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_PACKAGE_NAME)) ?: ""
             notification["text"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_TEXT)) ?: ""
             notification["bigText"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_BIG_TEXT)) ?: ""
-            notification["id"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN__ID)) ?: ""
+            notification["_id"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN__ID)) ?: ""
+            notification["id"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_ID)) ?: ""
             notification["channelId"] = cursor.getString(cursor.getColumnIndex(NotificationDbHelper.COLUMN_CHANNEL_ID)) ?: ""
             notification["timestamp"] = cursor.getLong(cursor.getColumnIndex(NotificationDbHelper.COLUMN_TIMESTAMP))
             // Add other columns here
@@ -583,13 +642,13 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         return notifications
     }
 
-    private fun listNotificationsDeleted(): List<Map<String, Any>> {
-        val dbHelper = NotificationDeletedDbHelper(mContext)
+    private fun listNotificationsTmp(): List<Map<String, Any>> {
+        val dbHelper = NotificationTmpDbHelper(mContext)
         val db = dbHelper.readableDatabase
 
         val notifications = mutableListOf<Map<String, Any>>()
         val cursor = db.query(
-            NotificationDeletedDbHelper.TABLE_NOTIFICATIONS,
+            NotificationTmpDbHelper.TABLE_NOTIFICATIONS,
             null,
             null,
             null,
@@ -600,13 +659,14 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
         while (cursor.moveToNext()) {
             val notification = HashMap<String, Any>();
-            notification["title"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_TITLE)) ?: ""
-            notification["package_name"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_PACKAGE_NAME)) ?: ""
-            notification["text"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_TEXT)) ?: ""
-            notification["bigText"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_BIG_TEXT)) ?: ""
-            notification["id"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN__ID)) ?: ""
-            notification["channelId"] = cursor.getString(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_CHANNEL_ID)) ?: ""
-            notification["timestamp"] = cursor.getLong(cursor.getColumnIndex(NotificationDeletedDbHelper.COLUMN_TIMESTAMP))
+            notification["title"] = cursor.getString(cursor.getColumnIndex(NotificationTmpDbHelper.COLUMN_TITLE)) ?: ""
+            notification["package_name"] = cursor.getString(cursor.getColumnIndex(NotificationTmpDbHelper.COLUMN_PACKAGE_NAME)) ?: ""
+            notification["text"] = cursor.getString(cursor.getColumnIndex(NotificationTmpDbHelper.COLUMN_TEXT)) ?: ""
+            notification["bigText"] = cursor.getString(cursor.getColumnIndex(NotificationTmpDbHelper.COLUMN_BIG_TEXT)) ?: ""
+            notification["_id"] = cursor.getString(cursor.getColumnIndex(NotificationTmpDbHelper.COLUMN__ID)) ?: ""
+            notification["id"] = cursor.getString(cursor.getColumnIndex(NotificationTmpDbHelper.COLUMN_ID)) ?: ""
+            notification["channelId"] = cursor.getString(cursor.getColumnIndex(NotificationTmpDbHelper.COLUMN_CHANNEL_ID)) ?: ""
+            notification["timestamp"] = cursor.getLong(cursor.getColumnIndex(NotificationTmpDbHelper.COLUMN_TIMESTAMP))
             // Add other columns here
             notifications.add(notification)
         }
@@ -630,8 +690,6 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
     }
 
     private fun deserializeNotification(serializedNotification: String): Map<String, String>? {
-        // Desserialize a notificação aqui, se necessário, dependendo do formato em que ela foi salva
-        // Exemplo: você pode usar a biblioteca Gson novamente para desserializar JSON
         val gson = Gson()
         try {
             return gson.fromJson(serializedNotification, object : TypeToken<Map<String, String>>() {}.type)
@@ -641,11 +699,22 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         return null
     }
 
-    private fun removeNotificationFromSharedPreferences(timestamp: String, text: String): Boolean {
+    private fun removeNotificationFromLocalDb(timestamp: String, text: String): Boolean {
         val dbHelper = NotificationDbHelper(mContext)
         val db = dbHelper.writableDatabase
 
         val deletedRows = db.delete(NotificationDbHelper.TABLE_NOTIFICATIONS, "${NotificationDbHelper.COLUMN_TIMESTAMP} = ?", arrayOf("$timestamp"))
+
+        db.close()
+
+        return deletedRows > 0
+    }
+
+    private fun removeNotificationTmpFromLocalDb(timestamp: String, text: String): Boolean {
+        val dbHelper = NotificationTmpDbHelper(mContext)
+        val db = dbHelper.writableDatabase
+
+        val deletedRows = db.delete(NotificationTmpDbHelper.TABLE_NOTIFICATIONS, "${NotificationTmpDbHelper.COLUMN_TIMESTAMP} = ?", arrayOf("$timestamp"))
 
         db.close()
 

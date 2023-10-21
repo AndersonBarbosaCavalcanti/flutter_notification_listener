@@ -165,12 +165,12 @@ class NotificationsListener {
     }
   }
 
-  static Future<dynamic> listNotificationsDeleted() async {
+  static Future<dynamic> listNotificationsTmp() async {
     try {
-      final resultado = await _methodChannel.invokeMethod<dynamic>("service.listNotificationsDeleted");
+      final resultado = await _methodChannel.invokeMethod<dynamic>("service.listNotificationsTmp");
       return resultado;
     } catch (e) {
-      final resultado = await _bgMethodChannel.invokeMethod<dynamic>("service.listNotificationsDeleted");
+      final resultado = await _bgMethodChannel.invokeMethod<dynamic>("service.listNotificationsTmp");
       return resultado;
     }
   }
@@ -185,13 +185,13 @@ class NotificationsListener {
     }
   }
 
-  static Future<bool?> removeNotificationFromSharedPreferences(String timestamp, String text) async {
+  static Future<bool?> removeNotificationFromLocalDb(String timestamp, String text) async {
     try {
       return await _methodChannel
-          .invokeMethod<bool?>("service.removeNotificationFromSharedPreferences", [timestamp, text]);
+          .invokeMethod<bool?>("service.removeNotificationFromLocalDb", [timestamp, text]);
     } catch (e) {
       return await _bgMethodChannel
-          .invokeMethod<bool?>("service.removeNotificationFromSharedPreferences", [timestamp, text]);
+          .invokeMethod<bool?>("service.removeNotificationFromLocalDb", [timestamp, text]);
     }
   }
 

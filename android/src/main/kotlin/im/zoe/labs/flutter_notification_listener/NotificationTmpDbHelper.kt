@@ -4,12 +4,12 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class NotificationDeletedDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+class NotificationTmpDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        const val DATABASE_NAME = "notificationsDeleted.db"
+        const val DATABASE_NAME = "notificationsTmp.db"
         const val DATABASE_VERSION = 1
-        const val TABLE_NOTIFICATIONS = "notificationsDeleted"
+        const val TABLE_NOTIFICATIONS = "notificationsTmp"
         const val COLUMN_ID = "id"
         const val COLUMN_TITLE = "title"
         const val COLUMN_PACKAGE_NAME = "package_name"
