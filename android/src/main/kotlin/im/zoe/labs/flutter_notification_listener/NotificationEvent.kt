@@ -132,7 +132,8 @@ class NotificationEvent(context: Context, sbn: StatusBarNotification) {
 
         @RequiresApi(Build.VERSION_CODES.M)
         private fun convertIconToByteArray(context: Context, icon: Icon): ByteArray {
-            return convertBitmapToByteArray(icon.loadDrawable(context).toBitmap())
+            val bitmap = icon.loadDrawable(context)?.toBitmap() ?: return byteArrayOf()
+            return convertBitmapToByteArray(bitmap)
         }
 
         private fun convertBitmapToByteArray(bitmap: Bitmap): ByteArray {

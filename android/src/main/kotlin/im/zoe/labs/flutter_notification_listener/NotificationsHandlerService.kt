@@ -493,12 +493,21 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
 
     private fun sendEvent(evt: NotificationEvent) {
         //Log.d(TAG, "send notification event: ...")
+        Log.d(TAG, "send notification event: ${evt.data}")
 
         var listNotificationsTmp = listNotificationsTmp();
         var totTmp = 0;
         var totStatusBar = 0;
 
+        println("----listNotificationsTmp---")
         for (item in listNotificationsTmp) {
+            println("titleItem==${item["title"]}==")
+            println("titleEvt==${evt.data["title"]}==")
+            println("textItem==${item["text"]}==")
+            println("textEvt==${evt.data["text"]}==")
+            println("bigTextItem==${item["bigText"]}==")
+            println("bigTextEvt==${evt.data["bigText"]}==")
+            println("-------")
             if(
                 item["title"] == evt.data["title"] &&
                 item["package_name"] == evt.data["package_name"] &&
@@ -508,31 +517,58 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
                     totTmp += 1;
                 } else if(evt.data["bigText"] == null && item["bigText"] == "") {
                     totTmp += 1;
+                } else if(item["bigText"] == evt.data["bigText"]) {
+                    totTmp += 1;
                 }
             }
         }
+        println("----listNotificationsTmp---")
+        println("----listNotificationsStatusBar---")
 
         var listNotificationsStatusBar = getNotificationsFromStatusBar();
         for (item in listNotificationsStatusBar) {
+            println("titleItem==${item["title"]}==")
+            println("titleEvt==${evt.data["title"]}==")
+            println("textItem==${item["text"]}==")
+            println("textEvt==${evt.data["text"]}==")
+            println("bigTextItem==${item["bigText"]}==")
+            println("bigTextEvt==${evt.data["bigText"]}==")
+            println("-------")
             if(
                 item["title"] == evt.data["title"] &&
                 item["package_name"] == evt.data["package_name"] &&
-                item["text"] == evt.data["text"] &&
-                item["bigText"] == evt.data["bigText"]
+                item["text"] == evt.data["text"]
             ) {
-                totStatusBar++;
+                if(evt.data["bigText"] != null && item["bigText"] == evt.data["bigText"]) {
+                    totStatusBar += 1;
+                } else if(evt.data["bigText"] == null && item["bigText"] == "") {
+                    totStatusBar += 1;
+                } else if(item["bigText"] == evt.data["bigText"]) {
+                    totStatusBar += 1;
+                }
             }
         }
+        println("----listNotificationsStatusBar---")
+
+        println("=====")
+        println(totTmp)
+        println(totStatusBar)
+        println("=====")
 
         if(totTmp == 0) {
             for (item in listNotificationsTmp) {
                 if(
                     item["title"] == evt.data["title"] &&
                     item["package_name"] == evt.data["package_name"] &&
-                    item["text"] == evt.data["text"] &&
-                    item["bigText"] == evt.data["bigText"]
+                    item["text"] == evt.data["text"]
                 ) {
-                    removeNotificationFromLocalDb("${item["timestamp"]}", "")
+                    if(evt.data["bigText"] != null && item["bigText"] == evt.data["bigText"]) {
+                        removeNotificationFromLocalDb("${item["timestamp"]}", "")
+                    } else if(evt.data["bigText"] == null && item["bigText"] == "") {
+                        removeNotificationFromLocalDb("${item["timestamp"]}", "")
+                    } else if(item["bigText"] == evt.data["bigText"]) {
+                        removeNotificationFromLocalDb("${item["timestamp"]}", "")
+                    }
                 }
             }
         }
@@ -683,7 +719,46 @@ class NotificationsHandlerService: MethodChannel.MethodCallHandler, Notification
         for (sbn in activeNotifications) {
 
             val evt = NotificationEvent(mContext, sbn)
-            notifications.add(evt.data)
+            //notifications.add(evt.data)
+
+            var title = evt.data["title"]
+            var package_name = evt.data["package_name"]
+            var text = evt.data["text"]
+            var bigText = evt.data["bigText"]
+
+            var info = Utils.Marshaller.marshal(sbn) as HashMap<*, *>;
+//            println("------")
+//            println(info)
+//            println("---==---")
+            var notific = info["notification"] as? Map<*, *>
+            var extras = notific?.get("extras") as? Map<*, *>
+            var messages = extras?.get("android.messages") as? List<Map<*, *>>
+            if(messages == null) {
+                val item = HashMap<String, Any?>()
+                item["title"] = title
+                item["package_name"] = package_name
+                item["text"] = text
+                item["bigText"] = bigText
+                notifications.add(item)
+            } else {
+                for (message in messages) {
+                    var title = message["sender"] as? String
+                    if(title == null) {
+                        title = ""
+                    }
+                    var text = message["text"] as? String
+                    if(text == null) {
+                        text = ""
+                    }
+
+                    val item = HashMap<String, Any?>()
+                    item["title"] = title
+                    item["package_name"] = package_name
+                    item["text"] = text
+                    item["bigText"] = ""
+                    notifications.add(item)
+                }
+            }
         }
 
         return notifications
